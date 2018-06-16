@@ -159,7 +159,8 @@ gulp.task('browser-sync', ['styles', 'scripts', 'images', 'copyHtml', 'copyAsset
     browserSync.init({
         server: {
             baseDir: "./dist/"
-        }
+        },
+        port: 4000
         //Use if you don't want BS to open a tab in your browser when it starts up
         //open: false
         // Will not attempt to determine your network status, assumes you're OFFLINE

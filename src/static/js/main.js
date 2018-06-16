@@ -1,43 +1,5 @@
 /* globals Deferred, js */
 
-var loaders = [];
-var imgpath = 'static/img/';
-var imageloadprogress = 0;
-var imageloadtotal = 0;
-
-var allimages = [
-	{
-		'name': 'pictures',
-		'images': ['city.jpg'],
-		'dir': ''
-	},
-];
-
-//preload images
-function loadFile(src,array,num){
-	var deferred = new Deferred();
-	var sprite = new Image();
-	sprite.onload = function() {
-		array[num] = sprite;
-		deferred.resolve();
-		imageloadprogress++;
-		//document.getElementById('loading').style.width = (imageloadprogress / imageloadtotal) * 100 + '%';
-	};
-	sprite.src = src;
-    return deferred.promise();
-}
-
-//loop through and call all the preload images
-function callAllPreloads(array,dir){
-    for(var z = 0; z < array.length; z++){
-        loaders.push(loadFile(dir + array[z], array, z));
-    }
-}
-
-for(var im = 0; im < allimages.length; im++){
-	imageloadtotal += allimages[im].images.length;
-	callAllPreloads(allimages[im].images, imgpath + allimages[im].dir + '/');
-}
 
 function NewPiece(x,y,w,h,solvedx,solvedy,spritex,spritey,rowx,rowy){
 	this.x = x;
@@ -75,37 +37,37 @@ var js = {
 	solvedpieces: [],
 	clickedpiece: -1,
 	debug: 0,
+	config: {},
 
     general: {
-        init: function(){
-			js.canvas = document.getElementById('canvas');
+        init: function(config){
+					js.config = config
+			js.canvas = document.getElementById(config.canvasId);
             if(!js.canvas.getContext){
-                document.getElementById('canvas').innerHTML = 'Your browser does not support canvas. Sorry.';
+                document.getElementById(config.canvasId).innerHTML = 'Your browser does not support canvas. Sorry.';
             }
             else {
                 js.ctx = js.canvas.getContext('2d');
-                js.general.initPuzzle();
+                js.general.initPuzzle(config);
 	            this.setupEvents();
 	            setInterval(js.general.drawPieces,10);
             }
         },
-        initPuzzle: function(){
-            js.puzzle = allimages[0].images[0];
+        initPuzzle: function(config){
+            js.puzzle = config.image;
 			js.idealw = js.puzzle.width;
 			js.idealh = js.puzzle.height;
             js.general.initCanvasSize();
             js.savedcanvasw = js.canvasw;
             js.savedcanvash = js.canvash;
-            js.piececountx = 6;
-            js.piececounty = 3;
-			document.getElementById('piecesx').value = js.piececountx;
-			document.getElementById('piecesy').value = js.piececounty;
+            js.piececountx = config.piececountx;
+            js.piececounty = config.piececounty;
 	        js.general.createPieces();
         },
 
         //initialise the size of the canvas based on the ideal aspect ratio and the size of the parent element
 		initCanvasSize: function(){
-			var parentel = document.getElementById('canvasparent');
+			var parentel = js.canvas.parentElement;
 			var targetw = parentel.offsetWidth;
 			var targeth = parentel.offsetHeight;
 
@@ -160,8 +122,6 @@ var js = {
             js.savedcanvash = js.canvash;
         },
         resetPuzzle: function(){
-            document.getElementById('options').className = 'optionswrapper';
-			document.getElementById('body').className = '';
             js.general.initPuzzle();
         },
         randomNumber: function(min,max){
@@ -191,23 +151,6 @@ var js = {
 				}
 			},false);
 
-			var onupdate = ((document.ontouchstart!==null)?'mousedown':'touchstart');
-			document.getElementById('updatePuzzle').addEventListener(onupdate,function(e){
-				js.general.updateSettings();
-			},false);
-
-			var showoptions = ((document.ontouchstart!==null)?'mousedown':'touchstart');
-			document.getElementById('showoptions').addEventListener(showoptions,function(e){
-                document.getElementById('options').className = 'optionswrapper shown';
-			},false);
-			var hideoptions = ((document.ontouchstart!==null)?'mousedown':'touchstart');
-			document.getElementById('hideoptions').addEventListener(hideoptions,function(e){
-                document.getElementById('options').className = 'optionswrapper';
-			},false);
-			var reset = ((document.ontouchstart!==null)?'mousedown':'touchstart');
-			document.getElementById('resetPuzzle').addEventListener(reset,function(e){
-                js.general.resetPuzzle();
-			},false);
 
 		},
 
@@ -254,9 +197,10 @@ var js = {
 				js.pieces[js.clickedpiece].offsety = 0;
 				js.general.checkSolved();
 				js.clickedpiece = -1;
-				
+
 				if(js.pieces.length === 0){
-					document.getElementById('body').className = 'solved';
+					//document.getElementById('body').className = 'solved';
+					//TODO: callback solved
 				}
 			}
 		},
@@ -277,7 +221,7 @@ var js = {
 			var sx = js.pieces[js.clickedpiece].solvedx;
 			var sy = js.pieces[js.clickedpiece].solvedy;
 
-			var tolerance = 30;
+			var tolerance = js.config.tolerance;
 			//console.log(newx,sx);
 
 			//if the piece is solved
@@ -285,7 +229,7 @@ var js = {
 				js.pieces[js.clickedpiece].x = sx;
 				js.pieces[js.clickedpiece].y = sy;
 				js.pieces[js.clickedpiece].solved = 1;
-				
+
 				var tmp = js.pieces[js.clickedpiece];
 				//remove the piece from the array of pieces and add to the solved array
 				//means we can always draw the solved pieces first, beneath the unsolved
@@ -320,55 +264,13 @@ var js = {
 			}
 		},
 
-		//update the puzzle based on entered values when 'update' is clicked
-		updateSettings: function(){
-			var elAcross = document.getElementById('piecesx');
-			var elDown = document.getElementById('piecesy');
-
-			var across = Math.min(20,elAcross.value);
-			var down = Math.min(20,elDown.value);
-
-			var file = document.getElementById('fileupload').files[0];
-			//console.log(file);
-			if(typeof file !== 'undefined'){
-				var reader = new FileReader();
-				reader.onload = function(){
-					//console.log(reader.result);
-					var img = new Image();
-					img.src = reader.result;
-					img.onload = function(){
-						js.puzzle = img;
-						js.piececountx = across;
-						js.piececounty = down;
-						//fixme this is a repetition of some of the lines in init - could be more efficient
-						js.idealw = js.puzzle.width;
-						js.idealh = js.puzzle.height;
-		                js.general.initCanvasSize();
-		                js.savedcanvasw = js.canvasw;
-		                js.savedcanvash = js.canvash;
-						js.general.createPieces();
-					};
-				};
-				reader.readAsDataURL(file);
-			}
-			else {
-				js.piececountx = across;
-				js.piececounty = down;
-				js.general.createPieces();
-			}
-			elAcross.value = across;
-			elDown.value = down;
-			document.getElementById('body').className = '';
-            document.getElementById('options').className = 'optionswrapper';
-		},
-
 		hideAllPieces: function(){
 			//console.log('hideAllPieces');
 			for(var p = 0; p < js.pieces.length; p++){
 				js.pieces[p].visible = 0;
 			}
 		},
-		
+
 		//create all the pieces of the puzzle
 		createPieces: function(){
 			js.pieces = [];
@@ -401,7 +303,7 @@ var js = {
 				}
 			}
 		},
-		
+
 		//this seems to be returning false if the number is odd
         isEven: function(n) {
             return n % 2 == 0;
@@ -454,7 +356,7 @@ var js = {
 			}
 			js.ctx.arc(arcx, arcy, arcradius, arcstartAngle, arcendAngle, arccounterClockwise);
 		},
-		
+
         drawPiece: function(obj){
             var arcx = 0;
             var arcy = 0;
@@ -485,7 +387,7 @@ var js = {
 
             js.ctx.beginPath();
             js.ctx.moveTo(obj.x, obj.y); //top left corner
-            
+
             //deal with top edge
             if(obj.rowy > 0){
 				if(pieceYEven){
@@ -574,29 +476,22 @@ var js = {
 
             js.ctx.lineTo(obj.x, obj.y); //top left corner - back to origin
             js.ctx.closePath();
-            
+
             js.ctx.clip();
             js.ctx.drawImage(js.puzzle, 0 - obj.solvedx + obj.x, 0 - obj.solvedy + obj.y, js.canvasw, js.canvash);
             js.ctx.stroke();
             js.ctx.restore();
     	}
+	},
+	loadPuzzle: function(config) {
+	  var sprite = new Image();
+	  sprite.onload = function() {
+	    config["image"] = sprite
+	    js.general.init(config);
+	  };
+	  sprite.src = config.imagePath;
 	}
 
 };
 window.js = js;
 })(window);
-
-window.onload = function(){
-    Deferred.when(loaders).then(
-    	function(){
-		    js.general.init();
-		    //js.general.addClass(document.getElementById('loading'),'fadeout');
-		}
-    );
-
-	var resize;
-	window.addEventListener('resize', function(event){
-		clearTimeout(resize);
-		resize = setTimeout(js.general.resizeCanvas,200);
-	});
-};
